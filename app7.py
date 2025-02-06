@@ -619,22 +619,41 @@ def apply_excel_format5(writer, sheet_name, df):
         workbook = writer.book
         worksheet = workbook[sheet_name]
 
-        # Appliquer des bordures à toutes les cellules contenant des données
-        for row in range(1, len(df) + 1):
-            for col in range(len(df.columns)):
-                cell = worksheet.cell(row=row + 1, column=col + 1)  # +1 car Excel commence à 1
-                cell.border = openpyxl.styles.Border(
-                    left=openpyxl.styles.Side(style='thin'),
-                    right=openpyxl.styles.Side(style='thin'),
-                    top=openpyxl.styles.Side(style='thin'),
-                    bottom=openpyxl.styles.Side(style='thin')
-                )
+        # Style pour les en-têtes de colonnes
+        header_font = openpyxl.styles.Font(name="Arial", size=12, bold=True)
+        for cell in worksheet[1]:  # Ligne 1 pour les en-têtes
+            cell.font = header_font
 
-        # Ajouter un filtre en haut des colonnes
-        worksheet.auto_filter.ref = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df)}"
+        # Style pour les données (bordures)
+        border = openpyxl.styles.Border(
+            left=openpyxl.styles.Side(style='thin'),
+            right=openpyxl.styles.Side(style='thin'),
+            top=openpyxl.styles.Side(style='thin'),
+            bottom=openpyxl.styles.Side(style='thin')
+        )
+        for row in range(2, len(df) + 2):  # +2 car on commence à la ligne 2 (après les en-têtes)
+            for col in range(1, len(df.columns) + 1):
+                cell = worksheet.cell(row=row, column=col)
+                cell.border = border
+
+        # Ajustement automatique de la largeur des colonnes
+        for column in worksheet.columns:
+            max_length = 0
+            for cell in column:
+                try:  # Gérer les erreurs potentielles si la cellule ne contient pas de texte
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            worksheet.column_dimensions[column[0].column_letter].width = max_length + 2  # +2 pour un peu d'espace
+
+        # Filtre
+        worksheet.auto_filter.ref = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df) + 1}"  # +1 pour inclure les en-têtes
 
     except Exception as e:
         print(f"Erreur lors de l'application du format Excel : {e}")
+        raise  # Remonter l'exception pour Streamlit
+
 
 
 def export_excel5(duplicate_dict, combined_duplicates, df_original, original_without_duplicates):
