@@ -672,27 +672,14 @@ def export_excel5(duplicate_dict, combined_duplicates, df_original, original_wit
     output = io.BytesIO()
 
     try:
-        # 1. Suppression des colonnes inutiles de df_original et des DataFrames de doublons
-        columns_to_keep = df_original.columns  # Colonnes à garder (personnalisez cette liste)
-        df_original = df_original[columns_to_keep]
-
-        for col, df_dup in duplicate_dict.items():
-            duplicate_dict[col] = df_dup[columns_to_keep]
-
-        if not combined_duplicates.empty:
-            combined_duplicates = combined_duplicates[columns_to_keep]
-
-        if original_without_duplicates is not None and not original_without_duplicates.empty:
-            original_without_duplicates = original_without_duplicates[columns_to_keep]
-
-        # 2. Calcul des données sans doublons (avant remplacement NaN/Inf)
+        # Calcul des données sans doublons (avant remplacement NaN/Inf)
         if combined_duplicates.empty:
-            original_without_duplicates = df_original.drop_duplicates()
+            original_without_duplicates = df_original.drop_duplicates()  # Utiliser toutes les colonnes par défaut
         else:
             combined_cols = combined_duplicates.columns.tolist()
             original_without_duplicates = df_original.drop_duplicates(subset=combined_cols)
 
-        # 3. Remplacement des NaN et INF par "#NUM!" après le calcul des doublons
+        # Remplacer les NaN et INF par "#NUM!" après le calcul des doublons
         df_original = df_original.fillna("#NUM!")
         df_original.replace([float('inf'), float('-inf')], "#NUM!", inplace=True)
 
@@ -703,32 +690,40 @@ def export_excel5(duplicate_dict, combined_duplicates, df_original, original_wit
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             # Données initiales
             df_original.to_excel(writer, sheet_name="Données_Initiales", index=False)
+            apply_excel_format5(writer, "Données_Initiales", df_original)
 
             # Doublons par colonne
             for col, df_dup in duplicate_dict.items():
                 if not df_dup.empty:
                     df_dup.to_excel(writer, sheet_name=f"Doublons_{col}", index=False)
+                    apply_excel_format5(writer, f"Doublons_{col}", df_dup)
 
             # Doublons combinés
             if not combined_duplicates.empty:
                 combined_duplicates.to_excel(writer, sheet_name="Doublons_Combinés", index=False)
+                apply_excel_format5(writer, "Doublons_Combinés", combined_duplicates)
 
             # Données sans doublons
             if original_without_duplicates is not None and not original_without_duplicates.empty:
                 original_without_duplicates.to_excel(writer, sheet_name="Données_Sans_Doublons", index=False)
+                apply_excel_format5(writer, "Données_Sans_Doublons", original_without_duplicates)
+                total_sans_doublons = len(original_without_duplicates)
+            else:
+                total_sans_doublons = "Non inclus"
 
             # Récapitulatif
             recap_data = {
                 "Nombre total de lignes": [len(df_original)],
                 "Nombre total de doublons": [sum(len(df) for df in duplicate_dict.values() if not df.empty)],
-                "Nombre total sans doublons": [len(original_without_duplicates) if original_without_duplicates is not None else "Non inclus"]
+                "Nombre total sans doublons": [total_sans_doublons]
             }
             recap_df = pd.DataFrame(recap_data)
             recap_df.to_excel(writer, sheet_name="Récapitulatif", index=False)
+            apply_excel_format5(writer, "Récapitulatif", recap_df)
 
     except Exception as e:
         print(f"Une erreur est survenue lors de la création du fichier Excel : {e}")
-        raise
+        raise  # Important : Remonter l'exception pour Streamlit
 
     output.seek(0)
     return output
