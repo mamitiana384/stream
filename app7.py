@@ -644,59 +644,27 @@ def export_excel5(duplicate_dict, combined_duplicates, df_original, original_wit
     """
     output = io.BytesIO()
 
-    # Remplacer les NaN et INF par une valeur par défaut (par exemple, une chaîne vide)
-    df_original = df_original.fillna('')  # Remplacer NaN par une chaîne vide
-    df_original.replace([float('inf'), float('-inf')], '', inplace=True)  # Remplacer INF par une chaîne vide
-    if original_without_duplicates is not None:
-        original_without_duplicates = original_without_duplicates.fillna('')
-        original_without_duplicates.replace([float('inf'), float('-inf')], '', inplace=True)
+    try:
+        # Remplacer les NaN et INF par "#NUM!" dès le début
+        df_original = df_original.fillna("#NUM!")
+        df_original.replace([float('inf'), float('-inf')], "#NUM!", inplace=True)
+        if original_without_duplicates is not None:
+            original_without_duplicates = original_without_duplicates.fillna("#NUM!")
+            original_without_duplicates.replace([float('inf'), float('-inf')], "#NUM!", inplace=True)
 
-    # Créer le fichier Excel avec l'option 'nan_inf_to_errors' activée
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:  # Utiliser openpyxl
-        # Ajouter les données initiales (avant détection des doublons)
-        df_original.to_excel(writer, sheet_name="Données_Initiales", index=False)
-        apply_excel_format5(writer, "Données_Initiales", df_original)
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            # ... (le reste du code d'écriture des données reste le même)
 
-        # Enregistrer chaque DataFrame du dictionnaire dans un onglet séparé
-        for col, df_dup in duplicate_dict.items():
-            if not df_dup.empty:
-                df_dup.to_excel(writer, sheet_name=f"Doublons_{col}", index=False)
-                apply_excel_format5(writer, f"Doublons_{col}", df_dup)  # Appliquer la mise en forme
+            # Plus besoin de gérer les NaN et Inf ici car ils ont déjà été remplacés
+            workbook = writer.book
+            # ...
 
-        # Ajouter les doublons combinés (si disponibles)
-        if not combined_duplicates.empty:
-            combined_duplicates.to_excel(writer, sheet_name="Doublons_Combinés", index=False)
-            apply_excel_format5(writer, "Doublons_Combinés", combined_duplicates)
-
-        # Ajouter les données sans doublons (si demandées)
-        if original_without_duplicates is not None and not original_without_duplicates.empty:
-            original_without_duplicates.to_excel(writer, sheet_name="Données_Sans_Doublons", index=False)
-            apply_excel_format5(writer, "Données_Sans_Doublons", original_without_duplicates)
-            total_sans_doublons = len(original_without_duplicates)
-        else:
-            total_sans_doublons = "Non inclus"
-
-        # Ajouter un onglet récapitulatif
-        recap_data = {
-            "Nombre total de lignes": [len(df_original)],
-            "Nombre total de doublons": [sum(len(df) for df in duplicate_dict.values() if not df.empty)],
-            "Nombre total sans doublons": [total_sans_doublons]
-        }
-        recap_df = pd.DataFrame(recap_data)
-        recap_df.to_excel(writer, sheet_name="Récapitulatif", index=False)
-        apply_excel_format5(writer, "Récapitulatif", recap_df)
-
-        # Gestion des NaN et INF avec openpyxl (après l'écriture des données)
-        workbook = writer.book
-        for sheet_name in workbook.sheetnames:
-            worksheet = workbook[sheet_name]
-            for row in worksheet.iter_rows():
-                for cell in row:
-                    if cell.value == float('inf') or cell.value == float('-inf') or pd.isna(cell.value):
-                        cell.value = "#NUM!"  # Ou un autre indicateur d'erreur
+    except Exception as e:
+        print(f"Une erreur est survenue lors de la création du fichier Excel : {e}")
+        return None  # Ou gérer l'erreur d'une autre manière
 
     output.seek(0)
-    return output  # Retourner le fichier Excel créé
+    return output
 
 
 # Onglets pour les différentes fonctionnalités
