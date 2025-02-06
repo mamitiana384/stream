@@ -726,8 +726,6 @@ def export_excel5(duplicate_dict, combined_duplicates, df_original, original_wit
             recap_df = pd.DataFrame(recap_data)
             recap_df.to_excel(writer, sheet_name="Récapitulatif", index=False)
 
-            # ... (L'appel à apply_excel_format5 est géré dans la boucle principale, voir le code complet)
-
     except Exception as e:
         print(f"Une erreur est survenue lors de la création du fichier Excel : {e}")
         raise
