@@ -620,9 +620,13 @@ def apply_excel_format5(writer, sheet_name, df):
         worksheet = workbook[sheet_name]
 
         # Style pour les en-têtes de colonnes
-        header_font = openpyxl.styles.Font(name="Arial", size=12, bold=True)
-        for cell in worksheet[1]:  # Ligne 1 pour les en-têtes
+        header_font = openpyxl.styles.Font(name="Times New Roman", size=11, bold=True)
+        fill = openpyxl.styles.PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid") # Bleu clair pour la 1ère colonne
+
+        for i, cell in enumerate(worksheet[1], start=1):  # Ligne 1 pour les en-têtes, index commence à 1
             cell.font = header_font
+            if i == 1: # Première colonne
+                cell.fill = fill
 
         # Style pour les données (bordures)
         border = openpyxl.styles.Border(
@@ -635,6 +639,8 @@ def apply_excel_format5(writer, sheet_name, df):
             for col in range(1, len(df.columns) + 1):
                 cell = worksheet.cell(row=row, column=col)
                 cell.border = border
+                cell.font = openpyxl.styles.Font(name="Times New Roman", size=11) # Police pour les données
+
 
         # Ajustement automatique de la largeur des colonnes
         for column in worksheet.columns:
@@ -644,7 +650,7 @@ def apply_excel_format5(writer, sheet_name, df):
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except:
-                    pass
+                    pass #si la cellule est vide, on ne fait rien
             worksheet.column_dimensions[column[0].column_letter].width = max_length + 2  # +2 pour un peu d'espace
 
         # Filtre
