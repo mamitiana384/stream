@@ -620,27 +620,27 @@ def apply_excel_format5(writer, sheet_name, df):
         worksheet = workbook[sheet_name]
 
         # Style pour les en-têtes de colonnes
-        header_font = openpyxl.styles.Font(name="Times New Roman", size=11, bold=True)
-        fill = openpyxl.styles.PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid") # Bleu clair pour la 1ère colonne
+        header_font = openpyxl.styles.Font(name="Times New Roman", size=10, bold=True)
+        fill = openpyxl.styles.PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid") # Bleu clair
 
-        for i, cell in enumerate(worksheet[1], start=1):  # Ligne 1 pour les en-têtes, index commence à 1
+        for cell in worksheet[1]:  # Ligne 1 pour les en-têtes
             cell.font = header_font
-            if i == 1: # Première colonne
-                cell.fill = fill
+            cell.fill = fill # Couleur de fond pour toute la ligne d'en-tête
 
-        # Style pour les données (bordures)
+        # Style pour les données (bordures et police)
         border = openpyxl.styles.Border(
             left=openpyxl.styles.Side(style='thin'),
             right=openpyxl.styles.Side(style='thin'),
             top=openpyxl.styles.Side(style='thin'),
             bottom=openpyxl.styles.Side(style='thin')
         )
+        data_font = openpyxl.styles.Font(name="Times New Roman", size=11)  # Police pour les données
+
         for row in range(2, len(df) + 2):  # +2 car on commence à la ligne 2 (après les en-têtes)
             for col in range(1, len(df.columns) + 1):
                 cell = worksheet.cell(row=row, column=col)
                 cell.border = border
-                cell.font = openpyxl.styles.Font(name="Times New Roman", size=11) # Police pour les données
-
+                cell.font = data_font
 
         # Ajustement automatique de la largeur des colonnes
         for column in worksheet.columns:
@@ -650,7 +650,7 @@ def apply_excel_format5(writer, sheet_name, df):
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except:
-                    pass #si la cellule est vide, on ne fait rien
+                    pass
             worksheet.column_dimensions[column[0].column_letter].width = max_length + 2  # +2 pour un peu d'espace
 
         # Filtre
@@ -658,7 +658,7 @@ def apply_excel_format5(writer, sheet_name, df):
 
     except Exception as e:
         print(f"Erreur lors de l'application du format Excel : {e}")
-        raise  # Remonter l'exception pour Streamlit
+        raise
 
 
 
