@@ -16,6 +16,7 @@ import plotly.express as px
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode # type: ignore
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl import load_workbook
 # Function to standardize the values for consistent searching
 # Fonction de normalisation pour les numéros de téléphone
 
@@ -613,24 +614,27 @@ def detect_combined_duplicates(df, columns):
     return combined_duplicates
 
 def apply_excel_format5(writer, sheet_name, df):
-    """Applique une mise en forme de base à une feuille Excel."""
-    workbook = writer.book
-    worksheet = workbook[sheet_name]
+    """Applique une mise en forme de base à la feuille Excel."""
+    try:
+        workbook = writer.book
+        worksheet = workbook[sheet_name]
 
-    # Mise en forme des en-têtes (gras)
-    for cell in worksheet[1]:  # Première ligne (en-têtes)
-        cell.font = openpyxl.styles.Font(bold=True)
+        # Appliquer des bordures à toutes les cellules contenant des données
+        for row in range(1, len(df) + 1):
+            for col in range(len(df.columns)):
+                cell = worksheet.cell(row=row + 1, column=col + 1)  # +1 car Excel commence à 1
+                cell.border = openpyxl.styles.Border(
+                    left=openpyxl.styles.Side(style='thin'),
+                    right=openpyxl.styles.Side(style='thin'),
+                    top=openpyxl.styles.Side(style='thin'),
+                    bottom=openpyxl.styles.Side(style='thin')
+                )
 
-    # Ajustement automatique de la largeur des colonnes
-    for column in worksheet.columns:
-        max_length = 0
-        for cell in column:
-            try:
-                cell_length = len(str(cell.value))
-                max_length = max(max_length, cell_length)
-            except:
-                pass
-        worksheet.column_dimensions[column[0].column_letter].width = max_length + 2  # Ajouter un peu d'espace
+        # Ajouter un filtre en haut des colonnes
+        worksheet.auto_filter.ref = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df)}"
+
+    except Exception as e:
+        print(f"Erreur lors de l'application du format Excel : {e}")
 
 
 def export_excel5(duplicate_dict, combined_duplicates, df_original, original_without_duplicates):
@@ -645,23 +649,58 @@ def export_excel5(duplicate_dict, combined_duplicates, df_original, original_wit
     output = io.BytesIO()
 
     try:
-        # Remplacer les NaN et INF par "#NUM!" dès le début
+        # Calcul des données sans doublons (avant remplacement NaN/Inf)
+        if combined_duplicates.empty:
+            original_without_duplicates = df_original.drop_duplicates()  # Utiliser toutes les colonnes par défaut
+        else:
+            combined_cols = combined_duplicates.columns.tolist()
+            original_without_duplicates = df_original.drop_duplicates(subset=combined_cols)
+
+        # Remplacer les NaN et INF par "#NUM!" après le calcul des doublons
         df_original = df_original.fillna("#NUM!")
         df_original.replace([float('inf'), float('-inf')], "#NUM!", inplace=True)
+
         if original_without_duplicates is not None:
             original_without_duplicates = original_without_duplicates.fillna("#NUM!")
             original_without_duplicates.replace([float('inf'), float('-inf')], "#NUM!", inplace=True)
 
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            # ... (le reste du code d'écriture des données reste le même)
+            # Données initiales
+            df_original.to_excel(writer, sheet_name="Données_Initiales", index=False)
+            apply_excel_format5(writer, "Données_Initiales", df_original)
 
-            # Plus besoin de gérer les NaN et Inf ici car ils ont déjà été remplacés
-            workbook = writer.book
-            # ...
+            # Doublons par colonne
+            for col, df_dup in duplicate_dict.items():
+                if not df_dup.empty:
+                    df_dup.to_excel(writer, sheet_name=f"Doublons_{col}", index=False)
+                    apply_excel_format5(writer, f"Doublons_{col}", df_dup)
+
+            # Doublons combinés
+            if not combined_duplicates.empty:
+                combined_duplicates.to_excel(writer, sheet_name="Doublons_Combinés", index=False)
+                apply_excel_format5(writer, "Doublons_Combinés", combined_duplicates)
+
+            # Données sans doublons
+            if original_without_duplicates is not None and not original_without_duplicates.empty:
+                original_without_duplicates.to_excel(writer, sheet_name="Données_Sans_Doublons", index=False)
+                apply_excel_format5(writer, "Données_Sans_Doublons", original_without_duplicates)
+                total_sans_doublons = len(original_without_duplicates)
+            else:
+                total_sans_doublons = "Non inclus"
+
+            # Récapitulatif
+            recap_data = {
+                "Nombre total de lignes": [len(df_original)],
+                "Nombre total de doublons": [sum(len(df) for df in duplicate_dict.values() if not df.empty)],
+                "Nombre total sans doublons": [total_sans_doublons]
+            }
+            recap_df = pd.DataFrame(recap_data)
+            recap_df.to_excel(writer, sheet_name="Récapitulatif", index=False)
+            apply_excel_format5(writer, "Récapitulatif", recap_df)
 
     except Exception as e:
         print(f"Une erreur est survenue lors de la création du fichier Excel : {e}")
-        return None  # Ou gérer l'erreur d'une autre manière
+        raise  # Important : Remonter l'exception pour Streamlit
 
     output.seek(0)
     return output
