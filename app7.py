@@ -658,13 +658,6 @@ def apply_excel_format5(writer, sheet_name, df):
         print(f"Erreur lors de l'application du format Excel : {e}")
         raise
 
-Python
-
-import pandas as pd
-import io
-from openpyxl import load_workbook
-import openpyxl.styles
-
 def export_excel5(duplicate_dict, combined_duplicates, df_original, original_without_duplicates):
     """
     Crée un fichier Excel avec mise en forme :
