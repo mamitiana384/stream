@@ -619,48 +619,51 @@ def apply_excel_format5(writer, sheet_name, df):
         workbook = writer.book
         worksheet = workbook[sheet_name]
 
-        # Style pour les en-têtes de colonnes
-        header_font = openpyxl.styles.Font(name="Times New Roman", size=10, bold=True)
-        fill = openpyxl.styles.PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid") # Bleu clair
+        # Style pour les en-têtes de colonnes (plage)
+        header_font = openpyxl.styles.Font(name="Times New Roman", size=11, bold=True)
+        fill = openpyxl.styles.PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
 
-        for cell in worksheet[1]:  # Ligne 1 pour les en-têtes
-            cell.font = header_font
-            cell.fill = fill # Couleur de fond pour toute la ligne d'en-tête
+        header_range = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}1"
+        worksheet[header_range].font = header_font
+        worksheet[header_range].fill = fill
 
-        # Style pour les données (bordures et police)
+        # Style pour les données (bordures et police, plage)
         border = openpyxl.styles.Border(
             left=openpyxl.styles.Side(style='thin'),
             right=openpyxl.styles.Side(style='thin'),
             top=openpyxl.styles.Side(style='thin'),
             bottom=openpyxl.styles.Side(style='thin')
         )
-        data_font = openpyxl.styles.Font(name="Times New Roman", size=11)  # Police pour les données
+        data_font = openpyxl.styles.Font(name="Times New Roman", size=11)
 
-        for row in range(2, len(df) + 2):  # +2 car on commence à la ligne 2 (après les en-têtes)
-            for col in range(1, len(df.columns) + 1):
-                cell = worksheet.cell(row=row, column=col)
-                cell.border = border
-                cell.font = data_font
+        data_range = f"A2:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df) + 1}"
+        worksheet[data_range].border = border
+        worksheet[data_range].font = data_font
 
         # Ajustement automatique de la largeur des colonnes
         for column in worksheet.columns:
             max_length = 0
             for cell in column:
-                try:  # Gérer les erreurs potentielles si la cellule ne contient pas de texte
+                try:
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except:
                     pass
-            worksheet.column_dimensions[column[0].column_letter].width = max_length + 2  # +2 pour un peu d'espace
+            worksheet.column_dimensions[column[0].column_letter].width = max_length + 2
 
-        # Filtre
-        worksheet.auto_filter.ref = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df) + 1}"  # +1 pour inclure les en-têtes
+        # Filtre (plage)
+        worksheet.auto_filter.ref = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df) + 1}"
 
     except Exception as e:
         print(f"Erreur lors de l'application du format Excel : {e}")
         raise
 
+Python
 
+import pandas as pd
+import io
+from openpyxl import load_workbook
+import openpyxl.styles
 
 def export_excel5(duplicate_dict, combined_duplicates, df_original, original_without_duplicates):
     """
@@ -674,14 +677,27 @@ def export_excel5(duplicate_dict, combined_duplicates, df_original, original_wit
     output = io.BytesIO()
 
     try:
-        # Calcul des données sans doublons (avant remplacement NaN/Inf)
+        # 1. Suppression des colonnes inutiles de df_original et des DataFrames de doublons
+        columns_to_keep = df_original.columns  # Colonnes à garder (personnalisez cette liste)
+        df_original = df_original[columns_to_keep]
+
+        for col, df_dup in duplicate_dict.items():
+            duplicate_dict[col] = df_dup[columns_to_keep]
+
+        if not combined_duplicates.empty:
+            combined_duplicates = combined_duplicates[columns_to_keep]
+
+        if original_without_duplicates is not None and not original_without_duplicates.empty:
+            original_without_duplicates = original_without_duplicates[columns_to_keep]
+
+        # 2. Calcul des données sans doublons (avant remplacement NaN/Inf)
         if combined_duplicates.empty:
-            original_without_duplicates = df_original.drop_duplicates()  # Utiliser toutes les colonnes par défaut
+            original_without_duplicates = df_original.drop_duplicates()
         else:
             combined_cols = combined_duplicates.columns.tolist()
             original_without_duplicates = df_original.drop_duplicates(subset=combined_cols)
 
-        # Remplacer les NaN et INF par "#NUM!" après le calcul des doublons
+        # 3. Remplacement des NaN et INF par "#NUM!" après le calcul des doublons
         df_original = df_original.fillna("#NUM!")
         df_original.replace([float('inf'), float('-inf')], "#NUM!", inplace=True)
 
@@ -692,40 +708,34 @@ def export_excel5(duplicate_dict, combined_duplicates, df_original, original_wit
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             # Données initiales
             df_original.to_excel(writer, sheet_name="Données_Initiales", index=False)
-            apply_excel_format5(writer, "Données_Initiales", df_original)
 
             # Doublons par colonne
             for col, df_dup in duplicate_dict.items():
                 if not df_dup.empty:
                     df_dup.to_excel(writer, sheet_name=f"Doublons_{col}", index=False)
-                    apply_excel_format5(writer, f"Doublons_{col}", df_dup)
 
             # Doublons combinés
             if not combined_duplicates.empty:
                 combined_duplicates.to_excel(writer, sheet_name="Doublons_Combinés", index=False)
-                apply_excel_format5(writer, "Doublons_Combinés", combined_duplicates)
 
             # Données sans doublons
             if original_without_duplicates is not None and not original_without_duplicates.empty:
                 original_without_duplicates.to_excel(writer, sheet_name="Données_Sans_Doublons", index=False)
-                apply_excel_format5(writer, "Données_Sans_Doublons", original_without_duplicates)
-                total_sans_doublons = len(original_without_duplicates)
-            else:
-                total_sans_doublons = "Non inclus"
 
             # Récapitulatif
             recap_data = {
                 "Nombre total de lignes": [len(df_original)],
                 "Nombre total de doublons": [sum(len(df) for df in duplicate_dict.values() if not df.empty)],
-                "Nombre total sans doublons": [total_sans_doublons]
+                "Nombre total sans doublons": [len(original_without_duplicates) if original_without_duplicates is not None else "Non inclus"]
             }
             recap_df = pd.DataFrame(recap_data)
             recap_df.to_excel(writer, sheet_name="Récapitulatif", index=False)
-            apply_excel_format5(writer, "Récapitulatif", recap_df)
+
+            # ... (L'appel à apply_excel_format5 est géré dans la boucle principale, voir le code complet)
 
     except Exception as e:
         print(f"Une erreur est survenue lors de la création du fichier Excel : {e}")
-        raise  # Important : Remonter l'exception pour Streamlit
+        raise
 
     output.seek(0)
     return output
