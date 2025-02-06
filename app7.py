@@ -619,40 +619,42 @@ def apply_excel_format5(writer, sheet_name, df):
         workbook = writer.book
         worksheet = workbook[sheet_name]
 
-        # Style pour les en-têtes de colonnes (plage)
+        # Style pour les en-têtes de colonnes
         header_font = openpyxl.styles.Font(name="Times New Roman", size=11, bold=True)
-        fill = openpyxl.styles.PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid")
+        fill = openpyxl.styles.PatternFill(start_color="ADD8E6", end_color="ADD8E6", fill_type="solid") # Bleu clair
 
-        header_range = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}1"
-        worksheet[header_range].font = header_font
-        worksheet[header_range].fill = fill
+        for cell in worksheet[1]:  # Ligne 1 pour les en-têtes
+            cell.font = header_font
+            cell.fill = fill # Couleur de fond pour toute la ligne d'en-tête
 
-        # Style pour les données (bordures et police, plage)
+        # Style pour les données (bordures et police)
         border = openpyxl.styles.Border(
             left=openpyxl.styles.Side(style='thin'),
             right=openpyxl.styles.Side(style='thin'),
             top=openpyxl.styles.Side(style='thin'),
             bottom=openpyxl.styles.Side(style='thin')
         )
-        data_font = openpyxl.styles.Font(name="Times New Roman", size=11)
+        data_font = openpyxl.styles.Font(name="Times New Roman", size=11)  # Police pour les données
 
-        data_range = f"A2:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df) + 1}"
-        worksheet[data_range].border = border
-        worksheet[data_range].font = data_font
+        for row in range(2, len(df) + 2):  # +2 car on commence à la ligne 2 (après les en-têtes)
+            for col in range(1, len(df.columns) + 1):
+                cell = worksheet.cell(row=row, column=col)
+                cell.border = border
+                cell.font = data_font
 
         # Ajustement automatique de la largeur des colonnes
         for column in worksheet.columns:
             max_length = 0
             for cell in column:
-                try:
+                try:  # Gérer les erreurs potentielles si la cellule ne contient pas de texte
                     if len(str(cell.value)) > max_length:
                         max_length = len(str(cell.value))
                 except:
                     pass
-            worksheet.column_dimensions[column[0].column_letter].width = max_length + 2
+            worksheet.column_dimensions[column[0].column_letter].width = max_length + 2  # +2 pour un peu d'espace
 
-        # Filtre (plage)
-        worksheet.auto_filter.ref = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df) + 1}"
+        # Filtre
+        worksheet.auto_filter.ref = f"A1:{openpyxl.utils.get_column_letter(len(df.columns))}{len(df) + 1}"  # +1 pour inclure les en-têtes
 
     except Exception as e:
         print(f"Erreur lors de l'application du format Excel : {e}")
